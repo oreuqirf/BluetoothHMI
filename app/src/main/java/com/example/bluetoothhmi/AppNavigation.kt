@@ -10,6 +10,7 @@ import android.app.Application
 import androidx.compose.ui.platform.LocalContext
 
 import com.example.bluetoothhmi.ui.ConnectionScreen
+import com.example.bluetoothhmi.ui.DashboardScreen
 import com.example.bluetoothhmi.ui.DeviceDataScreen
 
 import com.example.bluetoothhmi.data.MyBluetoothViewModelFactory
@@ -25,7 +26,13 @@ fun AppNavigation() {
         factory = MyBluetoothViewModelFactory(application) // This call now matches the factory's constructor
     )
 
-    NavHost(navController = navController, startDestination = "connection_screen") {
+    NavHost(navController = navController, startDestination = "dashboard_screen") {
+        // Pantalla 0: Dashboard
+        composable("dashboard_screen") {
+            DashboardScreen(
+                navController = navController
+            )
+        }
         // Pantalla 1: Conexión
         composable("connection_screen") {
             ConnectionScreen(
