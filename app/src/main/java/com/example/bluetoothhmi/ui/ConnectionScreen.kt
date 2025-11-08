@@ -5,9 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log // <-- Import añadido
+import android.util.Log
 import android.widget.Toast
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,13 +19,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.rememberMultiplePermissionsState
-
-import com.example.bluetoothhmi.data.MyBluetoothViewModel
+import androidx.navigation.NavOptions
 import com.example.bluetoothhmi.connection.BluetoothService
 import com.example.bluetoothhmi.connection.ConnectionState
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.example.bluetoothhmi.data.MyBluetoothViewModel
 import com.example.bluetoothhmi.components.DeviceList
 import com.example.bluetoothhmi.components.ScanSection
 import com.example.bluetoothhmi.components.MiuiOptimizationDialog
@@ -41,7 +39,10 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
     val connectionState by viewModel.connectionState.collectAsState()
     val showMiuiDialog by viewModel.showMiuiWarningDialog.collectAsState()
 
-    // --- 1. ESTE LAUNCHEDEFFECT INICIA EL SERVICIO ---
+    // Observamos si el ViewModel está vinculado al Servicio.
+    val isServiceBound by viewModel.isServiceBound.collectAsState()
+
+    // Inicia el servicio en primer plano (solo 1 vez)
     LaunchedEffect(key1 = true) {
         Log.d("ConnectionScreen", "Iniciando BluetoothService...")
         Intent(context, BluetoothService::class.java).also { intent ->
@@ -53,8 +54,7 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
         }
     }
 
-    // --- 2. LÓGICA DE PERMISOS (¡CORREGIDA!) ---
-    // Aquí estaba el error de compilación.
+    // Lógica de Permisos
     val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         // Android 13+ (API 33)
         listOf(
@@ -74,27 +74,31 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
+            Manifest.permission.ACCESS_COARSE_LOCATION // <-- Escaneo Clásico necesita Ubicación
         )
     }
     val permissionState = rememberMultiplePermissionsState(permissions = permissions)
 
-    // --- 3. LAUNCHEDEFFECT PARA PROMOVER EL SERVICIO (sin cambios) ---
+    // Llama a 'onPermissionsGranted' del ViewModel cuando los permisos cambian
     LaunchedEffect(permissionState.allPermissionsGranted) {
         if (permissionState.allPermissionsGranted) {
-            Log.d("ConnectionScreen", "Permisos concedidos, promoviendo servicio a FG.")
-            viewModel.<promoteServiceToForeground()
+            Log.d("ConnectionScreen", "Permisos concedidos, notificando al ViewModel.")
+            viewModel.onPermissionsGranted() // Llama a la nueva función
         }
     }
 
-    // --- NAVEGACIÓN (sin cambios) ---
+    // Navegación (CORREGIDA al Dashboard)
     LaunchedEffect(connectionState) {
         if (connectionState is ConnectionState.Connected) {
-            navController.navigate("device_data_screen")
+            navController.navigate("dashboard_screen") {
+                // Limpia la pila de navegación para que el usuario
+                // no pueda "Volver" a la pantalla de conexión.
+                popUpTo("connection_screen") { inclusive = true }
+            }
         }
     }
 
-    // --- DIÁLOGO MIUI ---
+    // Diálogo MIUI (sin cambios)
     if (showMiuiDialog) {
         MiuiOptimizationDialog(
             onDismiss = { viewModel.onDismissMiuiWarning() }
@@ -104,12 +108,11 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
     // Listener para los mensajes de error de escaneo
     LaunchedEffect(key1 = true) {
         viewModel.scanErrorEvent.collect { message ->
-            // Muestra el error
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
 
-    // --- UI de la Pantalla de Conexión (¡ESTRUCTURA CORREGIDA!) ---
+    // --- UI de la Pantalla de Conexión ---
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -119,40 +122,51 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
         Text("Conexión Bluetooth", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(20.dp))
 
-        // --- 4. LÓGICA DE LAYOUT CORREGIDA ---
-        // El if/else ahora solo controla la PARTE MEDIA de la pantalla.
-        // El Spacer y el ConnectionState de abajo siempre estarán visibles.
         if (permissionState.allPermissionsGranted) {
-            // --- SI SÍ TIENE PERMISOS, MUESTRA LA APP NORMAL ---
-            ScanSection(
-                isScanning = isScanning,
-                onStartScan = { viewModel.startScan() },
-                onStopScan = { viewModel.stopScan() }
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Lógica de UI: Muestra carga o escaneo
+            if (isServiceBound) {
+                // 1. Permisos OK y Servicio VINCULADO: Muestra la UI de escaneo
+                ScanSection(
+                    isScanning = isScanning,
+                    onStartScan = { viewModel.startScan() },
+                    onStopScan = { viewModel.stopScan() }
+                )
 
-            DeviceList(
-                devices = discoveredDevices,
-                onDeviceClick = { device -> viewModel.connectToDevice(device) },
-                modifier = Modifier.weight(1f) // <-- Correcto
-            )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                DeviceList(
+                    devices = discoveredDevices,
+                    onDeviceClick = { device -> viewModel.connectToDevice(device) },
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                // 2. Permisos OK, pero servicio VINCULANDO...: Muestra un Spinner
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Iniciando servicio Bluetooth...")
+                }
+            }
+
         } else {
-            // --- NO TIENE PERMISOS: Muestra la explicación ---
-            // ¡CAMBIO! Se usa Modifier.weight(1f) para que ocupe el espacio
-            // central y empuje el estado de conexión hacia abajo.
+            // 3. Permisos PENDIENTES: Muestra la UI de permisos
             Column(
                 modifier = Modifier
-                    .fillMaxWidth() // No fillMaxSize
+                    .fillMaxWidth()
                     .weight(1f)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val textToShow = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    "Esta app necesita permisos de 'Dispositivos Cercanos' (Bluetooth) y 'Notificaciones' para funcionar."
+                    "Esta app necesita permisos de 'Dispositivos Cercanos' y 'Notificaciones' para funcionar."
                 } else {
-                    "Esta app necesita permisos de Bluetooth y de 'Ubicación' para poder escanear dispositivos cercanos."
+                    "Esta app necesita permisos de Bluetooth y de 'Ubicación' para poder escanear."
                 }
 
                 Text(
@@ -182,10 +196,8 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
             }
         }
 
-        // --- 5. ESTA PARTE AHORA ESTÁ FUERA DEL IF/ELSE (CORRECTO) ---
+        // Esta parte siempre está visible en la parte inferior
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Muestra el estado de la conexión
         if (connectionState is ConnectionState.Connecting) {
             CircularProgressIndicator()
             Text("Conectando...")
@@ -193,7 +205,7 @@ fun ConnectionScreen(navController: NavController, viewModel: MyBluetoothViewMod
             Text(
                 "Error: ${(connectionState as ConnectionState.Error).message}",
                 color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center // Añadido para errores largos
+                textAlign = TextAlign.Center
             )
         }
     }

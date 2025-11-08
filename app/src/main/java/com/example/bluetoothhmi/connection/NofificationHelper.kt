@@ -7,7 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.example.bluetoothhmi.R // Asegúrate de tener un icono en res/drawable
+import com.example.bluetoothhmi.R // ¡Asegúrate de tener este icono!
 
 object NotificationHelper {
 
@@ -36,8 +36,10 @@ object NotificationHelper {
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("Servicio Bluetooth HMI")
             .setContentText(statusText)
-            //.setSmallIcon(R.drawable.ic_launcher_foreground) // ¡REEMPLAZA ESTO por tu icono!
-            .setSmallIcon(R.mipmap.ic_launcher) // <-- Cambia a mipmap.ic_launcher            .setOngoing(true) // Hace que sea persistente
+            // ¡Usa el icono de mipmap, es más seguro que drawable!
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true) // Hace que sea persistente
             .build()
     }
 }
+

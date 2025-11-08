@@ -1,19 +1,6 @@
 package com.example.bluetoothhmi.data
 
-/**
- * Representa los valores de "cero" y "escala completa" (full scale)
- * para un solo canal de ingeniería.
- */
-data class ChannelScaling(
-    val rawMin: Int = 800,
-    val rawMax: Int = 4000,
-    val zero: Float = 0.0f,
-    val full: Float = 100.0f
-)
-
-
-// ... (ChannelScaling data class)
-
+// Esta clase importará automáticamente la ChannelScaling del otro archivo
 data class ScalingData(
     val ai0: ChannelScaling = ChannelScaling(),
     val ai1: ChannelScaling = ChannelScaling(),

@@ -53,6 +53,10 @@ import android.content.Intent
 import android.content.ComponentName
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 
 
@@ -935,83 +939,112 @@ fun WorkModeEditorDialog(
     )
 }
 
+
+
+
+/**
+ * Esta es la tarjeta GPS corregida.
+ * Muestra los nuevos campos (model, softRevision, etc.)
+ * y maneja correctamente el estado nulo.
+ */
 @Composable
 fun GpsDataCard(
     gpsData: GpsData?,
-    onClick: () -> Unit // Para refrescar
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 16.dp)
-            .clickable { onClick() }, // Clic en la tarjeta refresca
+            .padding(vertical = 8.dp)
+            .clickable { onClick() }, // Habilita el clic
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Datos GPS", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "(Tocar tarjeta para refrescar)",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Posición GPS y Módem", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "(Tocar para refrescar)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             if (gpsData == null) {
                 Text(
-                    text = "Presione la tarjeta para cargar los datos.",
+                    "Presione la tarjeta para cargar los datos.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
-                // Función helper interna para el texto del Fix
-                val fixStatusText = when (gpsData.fixQuality) {
-                    0 -> "Sin Cobertura"
-                    1 -> "Fix 2D/3D"
-                    2 -> "Fix Diferencial (DGPS)"
-                    else -> "Desconocido (${gpsData.fixQuality})"
-                }
+                // Ahora es seguro acceder a 'gpsData'
+                // El icono de "Fix" se basa en si la latitud/longitud son 0
+                val hasFix = gpsData.latitude != 0.0 || gpsData.longitude != 0.0
 
-                // Fila 1: Latitud y Longitud
-                Row(Modifier.fillMaxWidth()) {
-                    GpsInfoItem(title = "Latitud", value = "%.6f".format(gpsData.latitude), Modifier.weight(1f))
-                    GpsInfoItem(title = "Longitud", value = "%.6f".format(gpsData.longitude), Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(12.dp))
+                GpsInfoItem(
+                    name = "Estado",
+                    value = if (hasFix) "Con Cobertura" else "Sin Cobertura",
+                    icon = if (hasFix) Icons.Default.LocationOn else Icons.Default.LocationOff,
+                    color = if (hasFix) MaterialTheme.colorScheme.primary else Color.Gray
+                )
 
-                // Fila 2: Altitud y Velocidad
-                Row(Modifier.fillMaxWidth()) {
-                    GpsInfoItem(title = "Altitud", value = "${"%.1f".format(gpsData.altitude)} m", Modifier.weight(1f))
-                    GpsInfoItem(title = "Velocidad", value = "${"%.1f".format(gpsData.speed)} km/h", Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
 
-                // Fila 3: Calidad y Satélites
-                Row(Modifier.fillMaxWidth()) {
-                    GpsInfoItem(title = "Calidad Fix", value = fixStatusText, Modifier.weight(1f))
-                    GpsInfoItem(title = "Satélites", value = gpsData.satellites.toString(), Modifier.weight(1f))
-                }
+                GpsInfoItem(name = "Modelo", value = gpsData.model)
+                GpsInfoItem(name = "Revisión SW", value = gpsData.softRevision)
+                GpsInfoItem(name = "ID Móvil", value = gpsData.mobileID)
+
+                Spacer(Modifier.height(8.dp))
+
+                GpsInfoItem(name = "Latitud", value = "%.6f".format(gpsData.latitude))
+                GpsInfoItem(name = "Longitud", value = "%.6f".format(gpsData.longitude))
             }
         }
     }
 }
 
 /**
- * Un pequeño Composable helper para mostrar un título y un valor.
- * Puedes ponerlo al final de SharedUI.kt
+ * Helper Composable para mostrar una fila de información del GPS.
+ * (Este también es necesario)
  */
 @Composable
-private fun GpsInfoItem(title: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+private fun GpsInfoItem(
+    name: String,
+    value: String,
+    icon: ImageVector? = null,
+    color: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = name,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary
+            text = "$name: ",
+            style = MaterialTheme.typography.bodyLarge,
+            color = color
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Bold,
+            color = color
         )
     }
 }
+
 
 /**
  * Un diálogo que advierte a los usuarios de MIUI sobre las optimizaciones de batería

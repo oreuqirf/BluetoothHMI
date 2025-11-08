@@ -11,5 +11,8 @@ data class SensorData(
     /** Lista de 2 valores flotantes para las salidas analógicas */
     val analogOutputs: List<Float>,
     /** Valor flotante para el voltaje de la batería */
-    val batteryVoltage: Float
+    val batteryVoltage: Float,
+    // Esto actúa como un ID único para forzar la actualización del StateFlow,
+    // incluso si los valores de los sensores son idénticos.
+    val id: Long = System.currentTimeMillis()
 )

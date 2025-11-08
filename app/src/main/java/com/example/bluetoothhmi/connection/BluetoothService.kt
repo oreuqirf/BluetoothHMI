@@ -8,13 +8,12 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
-// ¡Importaciones de BLE eliminadas!
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.LocationManager // ¡Este es importante!
+import android.location.LocationManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -45,7 +44,7 @@ class BluetoothService : Service() {
     private val binder = LocalBinder()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var notificationManager: NotificationManager
-    private lateinit var locationManager: LocationManager // Para la comprobación de GPS
+    private lateinit var locationManager: LocationManager
 
     inner class LocalBinder : Binder() {
         fun getService(): BluetoothService = this@BluetoothService
@@ -56,11 +55,8 @@ class BluetoothService : Service() {
     // --- Lógica de Bluetooth (Clásico) ---
     private lateinit var bluetoothManager: BluetoothManager
     private var bluetoothAdapter: BluetoothAdapter? = null
-    // (Escáner BLE eliminado)
 
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-
-    // (Filtros y Ajustes BLE eliminados)
 
     // Sockets, streams, etc.
     private var bluetoothSocket: BluetoothSocket? = null
@@ -78,7 +74,7 @@ class BluetoothService : Service() {
     val receivedData: SharedFlow<ByteArray> = _receivedData.asSharedFlow()
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
-    private val _scanError = MutableSharedFlow<String>() // Para errores de escaneo
+    private val _scanError = MutableSharedFlow<String>()
     val scanError = _scanError.asSharedFlow()
 
 
@@ -94,7 +90,6 @@ class BluetoothService : Service() {
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         NotificationHelper.createNotificationChannel(this)
 
-        // --- ¡CAMBIO! ---
         // Registramos AMBOS receivers
         val bondFilter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         registerReceiver(bondStateReceiver, bondFilter)
@@ -130,16 +125,15 @@ class BluetoothService : Service() {
     override fun onDestroy() {
         Log.d("BluetoothService", "Servicio Destruido.")
         serviceScope.cancel()
-        // --- ¡CAMBIO! ---
         // Desregistramos AMBOS
         unregisterReceiver(bondStateReceiver)
         unregisterReceiver(discoveryReceiver)
-        stopScan() // stopScan ahora usa Clásico
+        stopScan()
         disconnect()
         super.onDestroy()
     }
 
-    // --- Permisos (Sin cambios, ya está correcto con Ubicación) ---
+    // --- Permisos ---
     companion object {
         fun getRequiredPermissions(): Array<String> {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -170,8 +164,7 @@ class BluetoothService : Service() {
 
     // --- Callbacks de Escaneo y Vinculación ---
 
-    // --- ¡CAMBIO! ---
-    // Volvemos a usar 'discoveryReceiver' para el escaneo Clásico
+    // Este receiver ahora maneja el bucle de escaneo
     private val discoveryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -179,7 +172,6 @@ class BluetoothService : Service() {
                     val device: BluetoothDevice? =
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     device?.let {
-                        // Filtramos por nombre y duplicados
                         if (it.name != null && !_discoveredDevices.value.any { d -> d.address == it.address }) {
                             Log.d("BT_SERVICE", "Dispositivo Clásico encontrado: ${it.name} [${it.address}]")
                             _discoveredDevices.value += it
@@ -187,15 +179,21 @@ class BluetoothService : Service() {
                     }
                 }
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                    Log.d("BT_SERVICE", "Escaneo Clásico finalizado.")
-                    _isScanning.value = false
-                    updateNotification("Escaneo finalizado.")
+                    Log.d("BT_SERVICE", "Escaneo Clásico finalizado (12 seg).")
+                    // --- ¡AQUÍ ESTÁ LA LÓGICA DEL BUCLE! ---
+                    // Si _isScanning sigue 'true' (el usuario no pulsó "Stop"),
+                    // reiniciamos el escaneo inmediatamente.
+                    if (_isScanning.value) {
+                        Log.d("BT_SERVICE", "Reiniciando escaneo (bucle)...")
+                        bluetoothAdapter?.startDiscovery()
+                    } else {
+                        updateNotification("Escaneo finalizado.")
+                    }
                 }
             }
         }
     }
 
-    // (bondStateReceiver sin cambios)
     private val bondStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
@@ -230,16 +228,19 @@ class BluetoothService : Service() {
         return bluetoothAdapter?.bondedDevices?.size ?: 0
     }
 
-    // --- ¡CAMBIO! ---
-    // 'startScan' vuelve a usar 'startDiscovery()' (Clásico)
+    // 'startScan' usa 'startDiscovery()' (Clásico)
     fun startScan() {
         if (!hasRequiredPermissions() || bluetoothAdapter?.isEnabled != true) {
             Log.w("BT_SERVICE", "No se puede escanear: Faltan permisos o BT apagado.")
             return
         }
-        if (_isScanning.value) return
 
-        // Comprobación de GPS (sigue siendo necesaria para Clásico en < S)
+        // Si ya está escaneando, lo detenemos y reiniciamos
+        if (bluetoothAdapter?.isDiscovering == true) {
+            bluetoothAdapter?.cancelDiscovery()
+        }
+
+        // Comprobación de GPS
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
             if (!isGpsEnabled) {
@@ -257,18 +258,20 @@ class BluetoothService : Service() {
         // ¡Esta es la API Clásica!
         bluetoothAdapter?.startDiscovery()
 
-        _isScanning.value = true
+        _isScanning.value = true // <-- ¡IMPORTANTE! Esto activa el bucle
         updateNotification("Escaneando dispositivos...")
     }
 
-    // --- ¡CAMBIO! ---
-    // 'stopScan' vuelve a usar 'cancelDiscovery()' (Clásico)
+    // 'stopScan' usa 'cancelDiscovery()' (Clásico)
     fun stopScan() {
-        if (!hasRequiredPermissions() || !(_isScanning.value)) return
+        if (!hasRequiredPermissions()) return
 
-        Log.d("BT_SERVICE", "Escaneo Clásico detenido.")
-        bluetoothAdapter?.cancelDiscovery()
-        _isScanning.value = false
+        Log.d("BT_SERVICE", "Escaneo Clásico detenido por el usuario.")
+        _isScanning.value = false // <-- ¡IMPORTANTE! Esto detiene el bucle
+
+        if (bluetoothAdapter?.isDiscovering == true) {
+            bluetoothAdapter?.cancelDiscovery()
+        }
         updateNotification("Conexión inactiva.")
     }
 

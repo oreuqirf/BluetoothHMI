@@ -89,4 +89,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // O la versión más reciente
+    implementation("androidx.compose.material:material-icons-extended-android:1.6.8")
 }
