@@ -1,6 +1,12 @@
 pluginManagement {
     repositories {
-        google()
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -13,6 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BluetoothHMI"
+rootProject.name = "NFC_Reader_01"
 include(":app")
-
