@@ -1,27 +1,25 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.jetbrains.kotlin.android)
-    alias(libs.plugins.jetbrains.kotlin.compose)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
-    namespace = "com.example.bluetoothhmi"
-    compileSdk = 34
+    // Se mantiene el namespace
+    namespace = "com.example.nfc_reader_01"
+
+    // FIX FINAL: Actualizado a API 35 (o superior) para satisfacer a las dependencias.
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.bluetoothhmi"
+        applicationId = "com.example.nfc_reader_01"
+        // CLAVE: minSdk se queda en 26 para mantener la compatibilidad con Android 8.0.
         minSdk = 26
-        targetSdk = 34
+        // ACTUALIZADO: targetSdk debe coincidir con compileSdk.
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        vectorDrawables {
-            useSupportLibrary = true
-        }
     }
 
     buildTypes {
@@ -33,63 +31,45 @@ android {
             )
         }
     }
-
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
-
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
-
-    tasks.withType<KotlinCompile>().configureEach {
-        kotlinOptions {
-            freeCompilerArgs += "-opt-in=com.google.accompanist.permissions.ExperimentalPermissionsApi"
-        }
-    }
-
-    lint {
-        disable.add("ExperimentalApiUsage")
-        abortOnError = false
-    }
-
     buildFeatures {
-        compose = true
+        viewBinding = true
+        dataBinding = true
     }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
+    dependenciesInfo {
+        includeInApk = true
+        includeInBundle = true
     }
 }
 
 dependencies {
-    // Dependencias básicas
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
 
-    // Jetpack Compose
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.tooling.preview)
-    debugImplementation(libs.androidx.ui.tooling)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.navigation.compose)
+    // Dependencias Lifecycle
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
-    // Accompanist Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    // Versión estable para runtime-ktx:
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
-    // Testing
+    // Versiones directas estables de Navigation (2.7.7)
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation(libs.gson)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-
-    // O la versión más reciente
-    implementation("androidx.compose.material:material-icons-extended-android:1.6.8")
 }
