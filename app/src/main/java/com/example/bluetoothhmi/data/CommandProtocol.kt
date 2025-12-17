@@ -45,6 +45,8 @@ object CommandProtocol {
 
     const val SET_LOGOUT = "SET_LOGOUT;\n"
 
+    const val SET_SHUTDOWN = "SET_SHUTDOWN;\n"
+
 
     /**
      * Genera el comando para ESTABLECER la hora del dispositivo.

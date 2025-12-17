@@ -251,6 +251,16 @@ fun DashboardScreen( // <-- Este es el Dashboard de Gráfico/Tiempo Real
                 Text("Desconectar")
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            Button(
+                onClick = { viewModel.sendData(CommandProtocol.SET_SHUTDOWN) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) {
+                Text("Apagar Dispositivo")
+            }
+
             Spacer(Modifier.height(8.dp)) // Padding inferior
         }
     }
